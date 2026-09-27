@@ -1,0 +1,74 @@
+{
+  "entities": {
+    "UserProfile": {
+      "collection": "users",
+      "fields": {
+        "id": { "type": "string", "description": "Auth UID of the user" },
+        "displayName": { "type": "string", "description": "Player chosen name" },
+        "email": { "type": "string", "description": "Player email" },
+        "avatar": { "type": "string", "description": "Avatar character or color theme" },
+        "isOnline": { "type": "boolean", "description": "Current online availability" },
+        "lastActive": { "type": "number", "description": "Timestamp of last action" },
+        "stats": { "type": "map", "description": "Win loss stats { gamesPlayed, wins, losses, streak }" },
+        "createdAt": { "type": "number", "description": "Registration epoch time" }
+      }
+    },
+    "GameSession": {
+      "collection": "games",
+      "fields": {
+        "id": { "type": "string", "description": "Unique game ID" },
+        "roomCode": { "type": "string", "description": "6-char human readable room code" },
+        "status": { "type": "string", "description": "waiting | playing | completed | abandoned" },
+        "mode": { "type": "string", "description": "online | local | bot" },
+        "player1": { "type": "map", "description": "Player 1 details { uid, name, avatar, color, connected }" },
+        "player2": { "type": "map", "description": "Player 2 details { uid, name, avatar, color, connected }" },
+        "currentTurn": { "type": "string", "description": "player1 or player2" },
+        "diceValue": { "type": "number", "description": "1 to 6 rolled value" },
+        "diceRolled": { "type": "boolean", "description": "Whether dice is waiting for token move" },
+        "consecutiveSixes": { "type": "number", "description": "Track consecutive 6 rolls" },
+        "tokens": { "type": "map", "description": "player1 and player2 token arrays [{ id, step }]" },
+        "validMoves": { "type": "array", "description": "List of movable token indices" },
+        "winner": { "type": "string", "description": "player1 or player2 or null" },
+        "lastMove": { "type": "map", "description": "Summary of the previous move" },
+        "turnDeadline": { "type": "number", "description": "Timeout timestamp for turn" },
+        "messages": { "type": "array", "description": "In-game chat and reaction log" },
+        "createdAt": { "type": "number", "description": "Creation timestamp" },
+        "updatedAt": { "type": "number", "description": "Last update timestamp" }
+      }
+    },
+    "GameInvite": {
+      "collection": "invites",
+      "fields": {
+        "id": { "type": "string", "description": "Invite ID" },
+        "senderUid": { "type": "string", "description": "Sender User UID" },
+        "senderName": { "type": "string", "description": "Sender display name" },
+        "senderAvatar": { "type": "string", "description": "Sender avatar" },
+        "recipientUid": { "type": "string", "description": "Recipient User UID" },
+        "recipientName": { "type": "string", "description": "Recipient display name" },
+        "gameId": { "type": "string", "description": "Target game session ID" },
+        "roomCode": { "type": "string", "description": "Room code" },
+        "status": { "type": "string", "description": "pending | accepted | declined | expired" },
+        "createdAt": { "type": "number", "description": "Invite timestamp" }
+      }
+    },
+    "MatchRecord": {
+      "collection": "matches",
+      "fields": {
+        "id": { "type": "string", "description": "Match ID" },
+        "gameId": { "type": "string", "description": "Session ID" },
+        "player1Uid": { "type": "string", "description": "Player 1 UID" },
+        "player1Name": { "type": "string", "description": "Player 1 name" },
+        "player2Uid": { "type": "string", "description": "Player 2 UID" },
+        "player2Name": { "type": "string", "description": "Player 2 name" },
+        "winnerUid": { "type": "string", "description": "Winner UID" },
+        "winnerName": { "type": "string", "description": "Winner name" },
+        "winnerColor": { "type": "string", "description": "Winner token color" },
+        "durationSeconds": { "type": "number", "description": "Game duration in seconds" },
+        "turnsCount": { "type": "number", "description": "Total number of turns" },
+        "player1TokensFinished": { "type": "number", "description": "Finished tokens for P1" },
+        "player2TokensFinished": { "type": "number", "description": "Finished tokens for P2" },
+        "createdAt": { "type": "number", "description": "Finished timestamp" }
+      }
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Ludo Arena - Realtime Multiplayer",
+  "description": "Real-time online 2-player Ludo with player invites, live matchmaking, match history, and interactive board game rules.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
