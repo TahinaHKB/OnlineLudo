@@ -1,12 +1,12 @@
 {
-  "projectId": "fluted-league-3lxdt",
-  "appId": "1:10365258263:web:5a83308f27b78fc1cf2a52",
-  "apiKey": "AIzaSyAofj0HvsxrV4r_aTbnbYBbTize7DdpaVE",
-  "authDomain": "fluted-league-3lxdt.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-41637e41-91a6-4bea-8e21-ae55cfe4d2c0",
-  "storageBucket": "fluted-league-3lxdt.firebasestorage.app",
-  "messagingSenderId": "10365258263",
-  "measurementId": "",
-  "oAuthClientId": "10365258263-jmm3mskf7rm5t8k1qdcvuglc11ao1svv.apps.googleusercontent.com",
+  "projectId": "ludogame-65527",
+  "appId": "1:378603350374:web:d7a427a4b0e9c0614ac0a7",
+  "apiKey": "AIzaSyAiLejeYZBpLIM3vsi4mILCp6bysQsxhbg",
+  "authDomain": "ludogame-65527.firebaseapp.com",
+  "firestoreDatabaseId": "",
+  "storageBucket": "ludogame-65527.firebasestorage.app",
+  "messagingSenderId": "378603350374",
+  "measurementId": "G-LD3BF64X5Y",
+  "oAuthClientId": "",
   "recaptchaSiteKey": ""
 }
