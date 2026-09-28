@@ -61,7 +61,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div>
             <div className="flex items-center gap-1.5">
               <span className="font-display font-bold text-xl tracking-tight bg-gradient-to-r from-amber-400 via-rose-300 to-emerald-400 bg-clip-text text-transparent">
-                Ludo Arena
+                Lud‘s Noah
               </span>
               <span className="text-[10px] px-1.5 py-0.5 font-bold uppercase tracking-wider rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">
                 LIVE
