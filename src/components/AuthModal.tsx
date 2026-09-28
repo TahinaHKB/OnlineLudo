@@ -94,7 +94,7 @@ export const AuthModal: React.FC = () => {
             </div>
           </div>
           <h2 className="text-2xl sm:text-3xl font-black font-display text-white">
-            Ludo Arena
+            Lud‘s Noah
           </h2>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
             Real-time competitive online board game
