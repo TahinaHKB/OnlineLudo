@@ -91,6 +91,7 @@ export interface GameInvite {
   recipientName: string;
   gameId: string;
   roomCode: string;
+  gameType?: 'ludo' | 'battleship';
   status: 'pending' | 'accepted' | 'declined' | 'expired';
   createdAt: number;
 }
@@ -98,6 +99,7 @@ export interface GameInvite {
 export interface MatchHistoryRecord {
   id: string;
   gameId: string;
+  gameType?: 'ludo' | 'battleship';
   player1Uid: string;
   player1Name: string;
   player1Color: PlayerColor;

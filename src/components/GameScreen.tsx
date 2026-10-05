@@ -59,6 +59,19 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 
   const isMyTurn = mySlot !== null && game.currentTurn === mySlot && game.status === 'playing';
   const canRollDice = isMyTurn && !game.diceRolled && !isRolling;
+  const isAutoMoving = isMyTurn && game.diceRolled && game.validMoves.length === 1;
+
+  // Auto-execute if only one valid move exists ("si un seul coup est valable, il s'exécute automatiquement")
+  useEffect(() => {
+    if (!isMyTurn || !game.diceRolled || game.diceValue === null || isRolling) return;
+    if (game.validMoves.length === 1) {
+      const onlyMoveIndex = game.validMoves[0];
+      const timer = setTimeout(() => {
+        handleTokenClick(onlyMoveIndex);
+      }, 550);
+      return () => clearTimeout(timer);
+    }
+  }, [game.diceRolled, game.diceValue, game.validMoves, isMyTurn, isRolling]);
 
   // Real-time Firestore subscription (if online mode)
   useEffect(() => {
@@ -535,7 +548,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
         />
 
         {/* Dice Controller floating at bottom or center */}
-        <div className="mt-3 flex items-center justify-center gap-4">
+        <div className="mt-3 flex flex-col items-center justify-center gap-1.5">
           <Dice
             value={game.diceValue}
             isRolling={isRolling}
@@ -543,6 +556,11 @@ export const GameScreen: React.FC<GameScreenProps> = ({
             color={activeColor}
             onRoll={handleRoll}
           />
+          {isAutoMoving && (
+            <span className="text-[11px] font-bold text-amber-300 bg-amber-500/20 border border-amber-500/40 px-2.5 py-0.5 rounded-full animate-pulse">
+              ⚡ Coup unique : déplacement automatique...
+            </span>
+          )}
         </div>
 
         {/* Last Move Narrative Banner */}

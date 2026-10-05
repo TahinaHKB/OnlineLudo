@@ -27,6 +27,14 @@ service cloud.firestore {
       allow delete: if isAuthenticated();
     }
 
+    // Battleship games collection
+    match /battleship_games/{gameId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated();
+    }
+
     // Invites collection
     match /invites/{inviteId} {
       allow read: if isAuthenticated();

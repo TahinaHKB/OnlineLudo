@@ -8,30 +8,41 @@ import {
   Plus, 
   ArrowRight, 
   Share2, 
-  RefreshCw,
-  Search,
-  CheckCircle2,
-  ShieldCheck,
-  Dices
+  RefreshCw, 
+  ShieldCheck, 
+  Dices,
+  Anchor,
+  Crosshair,
+  Flame,
+  Droplet
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { gameService } from '../services/gameService';
+import { battleshipService } from '../services/battleshipService';
 import { GameState, UserProfile } from '../types/ludo';
+import { BattleshipGame } from '../types/battleship';
 import { sounds } from '../utils/audio';
 
 interface LobbyScreenProps {
-  onStartGame: (game: GameState) => void;
+  onStartLudo: (game: GameState) => void;
+  onStartBattleship: (game: BattleshipGame) => void;
+  initialGameTab?: 'ludo' | 'battleship';
 }
 
-export const LobbyScreen: React.FC<LobbyScreenProps> = ({ onStartGame }) => {
+export const LobbyScreen: React.FC<LobbyScreenProps> = ({
+  onStartLudo,
+  onStartBattleship,
+  initialGameTab = 'ludo',
+}) => {
   const { userProfile } = useAuth();
+  const [selectedGame, setSelectedGame] = useState<'ludo' | 'battleship'>(initialGameTab);
   const [joinCode, setJoinCode] = useState('');
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [onlinePlayers, setOnlinePlayers] = useState<UserProfile[]>([]);
   const [loadingPlayers, setLoadingPlayers] = useState(false);
   const [invitedPlayerId, setInvitedPlayerId] = useState<string | null>(null);
-  const [targetTokens, setTargetTokens] = useState<number>(4);
+  const [ludoTokensCount, setLudoTokensCount] = useState<number>(4);
 
   // Fetch online players
   const loadPlayers = async () => {
@@ -53,17 +64,23 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({ onStartGame }) => {
     return () => clearInterval(interval);
   }, [userProfile?.id]);
 
-  // Create Online Room
+  // Create Online Game
   const handleCreateOnline = async () => {
     if (!userProfile) return;
     setLoadingAction('create_online');
     setErrorMessage(null);
     try {
-      sounds.playTurn();
-      const game = await gameService.createOnlineGame(userProfile, targetTokens);
-      onStartGame(game);
+      if (selectedGame === 'ludo') {
+        sounds.playTurn();
+        const game = await gameService.createOnlineGame(userProfile, ludoTokensCount);
+        onStartLudo(game);
+      } else {
+        sounds.playSonar();
+        const game = await battleshipService.createOnlineGame(userProfile);
+        onStartBattleship(game);
+      }
     } catch (err: unknown) {
-      setErrorMessage(err instanceof Error ? err.message : 'Failed to create room');
+      setErrorMessage(err instanceof Error ? err.message : 'Échec de création');
     } finally {
       setLoadingAction(null);
     }
@@ -76,11 +93,24 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({ onStartGame }) => {
     setLoadingAction('join');
     setErrorMessage(null);
     try {
-      sounds.playTurn();
-      const game = await gameService.joinGameByCode(userProfile, joinCode.trim());
-      onStartGame(game);
+      const code = joinCode.trim().toUpperCase();
+      if (code.startsWith('NAV')) {
+        sounds.playSonar();
+        const game = await battleshipService.joinGameByCode(userProfile, code);
+        onStartBattleship(game);
+      } else {
+        sounds.playTurn();
+        try {
+          const game = await gameService.joinGameByCode(userProfile, code);
+          onStartLudo(game);
+        } catch (ludoErr) {
+          // If room not found in ludo, also try naval
+          const navGame = await battleshipService.joinGameByCode(userProfile, code);
+          onStartBattleship(navGame);
+        }
+      }
     } catch (err: unknown) {
-      setErrorMessage(err instanceof Error ? err.message : 'Failed to join room');
+      setErrorMessage(err instanceof Error ? err.message : 'Salle introuvable');
     } finally {
       setLoadingAction(null);
     }
@@ -90,10 +120,16 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({ onStartGame }) => {
   const handlePlayBot = async () => {
     if (!userProfile) return;
     setLoadingAction('bot');
-    sounds.playTurn();
     try {
-      const game = await gameService.createBotGame(userProfile);
-      onStartGame(game);
+      if (selectedGame === 'ludo') {
+        sounds.playTurn();
+        const game = await gameService.createBotGame(userProfile);
+        onStartLudo(game);
+      } else {
+        sounds.playSonar();
+        const game = await battleshipService.createBotGame(userProfile);
+        onStartBattleship(game);
+      }
     } finally {
       setLoadingAction(null);
     }
@@ -103,72 +139,149 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({ onStartGame }) => {
   const handlePassAndPlay = async () => {
     if (!userProfile) return;
     setLoadingAction('local');
-    sounds.playTurn();
     try {
-      const game = await gameService.createLocalGame(userProfile, 'Player 2');
-      onStartGame(game);
+      if (selectedGame === 'ludo') {
+        sounds.playTurn();
+        const game = await gameService.createLocalGame(userProfile, 'Joueur 2');
+        onStartLudo(game);
+      } else {
+        sounds.playSonar();
+        const game = await battleshipService.createLocalGame(userProfile, 'Joueur 2');
+        onStartBattleship(game);
+      }
     } finally {
       setLoadingAction(null);
     }
   };
 
   // Invite online player
-  const handleInvitePlayer = async (targetPlayer: UserProfile) => {
+  const handleInvitePlayer = async (targetPlayer: UserProfile, gameType: 'ludo' | 'battleship') => {
     if (!userProfile) return;
-    setInvitedPlayerId(targetPlayer.id);
-    sounds.playTurn();
+    setInvitedPlayerId(`${targetPlayer.id}_${gameType}`);
     try {
-      const game = await gameService.createOnlineGame(userProfile, targetTokens);
-      await gameService.sendGameInvite(userProfile, targetPlayer, game.id, game.roomCode);
-      onStartGame(game);
+      if (gameType === 'ludo') {
+        sounds.playTurn();
+        const game = await gameService.createOnlineGame(userProfile, ludoTokensCount);
+        await gameService.sendGameInvite(userProfile, targetPlayer, game.id, game.roomCode);
+        onStartLudo(game);
+      } else {
+        sounds.playSonar();
+        const game = await battleshipService.createOnlineGame(userProfile);
+        const { db, doc, collection, setDoc } = await import('../firebase');
+        const inviteId = doc(collection(db, 'invites')).id;
+        await setDoc(doc(db, 'invites', inviteId), {
+          id: inviteId,
+          senderUid: userProfile.id,
+          senderName: userProfile.displayName,
+          senderAvatar: userProfile.avatar,
+          recipientUid: targetPlayer.id,
+          recipientName: targetPlayer.displayName,
+          gameId: game.id,
+          roomCode: game.roomCode,
+          gameType: 'battleship',
+          status: 'pending',
+          createdAt: Date.now(),
+        });
+        onStartBattleship(game);
+      }
     } catch (err: unknown) {
-      setErrorMessage(err instanceof Error ? err.message : 'Failed to send invite');
+      setErrorMessage(err instanceof Error ? err.message : "Échec de l'invitation");
       setInvitedPlayerId(null);
     }
   };
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-6 space-y-8 animate-fade-in">
-      {/* Hero Banner */}
-      <div className="relative rounded-3xl bg-gradient-to-r from-amber-500/15 via-rose-500/15 to-indigo-600/15 border border-slate-800 p-6 sm:p-8 overflow-hidden shadow-xl">
-        <div className="relative z-10 max-w-2xl">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-bold uppercase tracking-wider mb-3">
-            <Sparkles className="w-3.5 h-3.5" />
-            Live 2-Player Ludo
+      {/* Platform Game Hub Selector */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+        {/* Game 1: Ludo */}
+        <div
+          onClick={() => {
+            setSelectedGame('ludo');
+            sounds.playTurn();
+          }}
+          className={`p-4 sm:p-5 rounded-3xl border-2 cursor-pointer transition-all duration-300 relative overflow-hidden group ${
+            selectedGame === 'ludo'
+              ? 'bg-gradient-to-br from-amber-500/20 via-rose-500/15 to-slate-900 border-amber-500/80 shadow-xl shadow-amber-500/10 ring-2 ring-amber-500/30'
+              : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 opacity-80'
+          }`}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-rose-500 flex items-center justify-center text-2xl shadow-lg shadow-amber-500/30 group-hover:scale-110 transition-transform">
+              🎲
+            </div>
+            <span
+              className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${
+                selectedGame === 'ludo'
+                  ? 'bg-amber-500 text-slate-950 font-bold'
+                  : 'bg-slate-800 text-slate-400'
+              }`}
+            >
+              {selectedGame === 'ludo' ? 'Sélectionné' : 'Jouer'}
+            </span>
           </div>
-          <h1 className="text-3xl sm:text-5xl font-black font-display text-white tracking-tight leading-tight mb-2">
-            Roll, Capture, <span className="text-amber-400">Dominate.</span>
-          </h1>
-          <p className="text-slate-300 text-sm sm:text-base leading-relaxed mb-6">
-            Challenge players online in real time, invite friends directly, or practice against our smart bot. Enjoy classic rules with safe zones and instant turns!
+
+          <h2 className="text-xl sm:text-2xl font-black font-display text-white mb-1">
+            Ludo Arena
+          </h2>
+          <p className="text-xs text-slate-300 leading-relaxed mb-3">
+            Plateau 15×15, dés 3D, captures enragées et zones étoiles sécurisées. Animation de saut et déplacement automatique d'un coup unique !
           </p>
 
-          {/* Quick Stats Pill if logged in */}
-          {userProfile && (
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="px-3.5 py-1.5 rounded-xl bg-slate-900/80 border border-slate-700/80 text-xs font-semibold text-slate-300 flex items-center gap-2">
-                <span>Total Matches:</span>
-                <span className="font-bold text-white font-mono">{userProfile.stats?.gamesPlayed || 0}</span>
-              </div>
-              <div className="px-3.5 py-1.5 rounded-xl bg-emerald-950/60 border border-emerald-700/50 text-xs font-semibold text-emerald-300 flex items-center gap-2">
-                <span>Wins:</span>
-                <span className="font-bold text-emerald-400 font-mono">{userProfile.stats?.wins || 0}</span>
-              </div>
-              <div className="px-3.5 py-1.5 rounded-xl bg-amber-950/60 border border-amber-700/50 text-xs font-semibold text-amber-300 flex items-center gap-2">
-                <span>Streak:</span>
-                <span className="font-bold text-amber-400 font-mono">{userProfile.stats?.streak || 0} 🔥</span>
-              </div>
-            </div>
-          )}
+          <div className="flex items-center gap-2 text-[11px] font-semibold text-amber-400">
+            <span>2 Joueurs</span>
+            <span>•</span>
+            <span>Animation fluide</span>
+            <span>•</span>
+            <span>Coup auto</span>
+          </div>
         </div>
 
-        {/* Decorative background dice */}
-        <div className="absolute -right-8 -bottom-8 opacity-15 pointer-events-none transform rotate-12">
-          <Dices className="w-64 h-64 text-amber-300" />
+        {/* Game 2: Bataille Navale */}
+        <div
+          onClick={() => {
+            setSelectedGame('battleship');
+            sounds.playSonar();
+          }}
+          className={`p-4 sm:p-5 rounded-3xl border-2 cursor-pointer transition-all duration-300 relative overflow-hidden group ${
+            selectedGame === 'battleship'
+              ? 'bg-gradient-to-br from-cyan-500/20 via-blue-600/15 to-slate-900 border-cyan-400/80 shadow-xl shadow-cyan-500/10 ring-2 ring-cyan-500/30'
+              : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 opacity-80'
+          }`}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-2xl shadow-lg shadow-cyan-500/30 group-hover:scale-110 transition-transform">
+              ⚓
+            </div>
+            <span
+              className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${
+                selectedGame === 'battleship'
+                  ? 'bg-cyan-400 text-slate-950 font-bold'
+                  : 'bg-slate-800 text-slate-400'
+              }`}
+            >
+              {selectedGame === 'battleship' ? 'Sélectionné' : 'Jouer'}
+            </span>
+          </div>
+
+          <h2 className="text-xl sm:text-2xl font-black font-display text-white mb-1">
+            Bataille Navale (7×9)
+          </h2>
+          <p className="text-xs text-slate-300 leading-relaxed mb-3">
+            Grille de 7×9 carreaux. Déployez secrètement vos 5 navires (2, 3, 3, 4 et 5 carreaux), visez au radar et coulez la flotte ennemie !
+          </p>
+
+          <div className="flex items-center gap-2 text-[11px] font-semibold text-cyan-400">
+            <span>Terrain 7×9</span>
+            <span>•</span>
+            <span>5 Navires</span>
+            <span>•</span>
+            <span>Brouillard secret</span>
+          </div>
         </div>
       </div>
 
-      {/* Error alert if any */}
+      {/* Error notification if any */}
       {errorMessage && (
         <div className="p-4 rounded-2xl bg-rose-500/20 border border-rose-500/40 text-rose-300 text-sm font-medium flex items-center justify-between">
           <span>{errorMessage}</span>
@@ -178,78 +291,104 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({ onStartGame }) => {
         </div>
       )}
 
-      {/* Primary Game Mode Grid */}
+      {/* Action Modes Grid for Selected Game */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-        {/* Create Online Duel */}
-        <div className="rounded-3xl bg-slate-900/90 border border-slate-800 p-6 flex flex-col justify-between hover:border-amber-500/40 transition-colors shadow-lg">
+        {/* Create Online Room */}
+        <div
+          className={`rounded-3xl bg-slate-900/90 border p-6 flex flex-col justify-between shadow-lg transition-colors ${
+            selectedGame === 'ludo'
+              ? 'border-slate-800 hover:border-amber-500/40'
+              : 'border-slate-800 hover:border-cyan-500/40'
+          }`}
+        >
           <div>
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center mb-4">
+            <div
+              className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 ${
+                selectedGame === 'ludo'
+                  ? 'bg-amber-500/20 text-amber-400'
+                  : 'bg-cyan-500/20 text-cyan-400'
+              }`}
+            >
               <Swords className="w-6 h-6" />
             </div>
             <h3 className="text-xl font-bold font-display text-white mb-1">
-              Create Online Duel
+              Créer un Duel en Ligne ({selectedGame === 'ludo' ? 'Ludo' : 'Naval'})
             </h3>
             <p className="text-xs sm:text-sm text-slate-400 mb-4">
-              Host a new game room with a unique room code. Invite a friend or wait for another player to join.
+              {selectedGame === 'ludo'
+                ? 'Hébergez une partie de Ludo avec un code de salle pour inviter un ami ou défier en ligne.'
+                : 'Créez une salle navale 7×9. Chaque joueur place secrètement ses 5 navires avant de faire feu.'}
             </p>
 
-            {/* Target tokens toggle */}
-            <div className="mb-4">
-              <span className="text-xs font-semibold text-slate-400 block mb-1.5">Game Length:</span>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setTargetTokens(4)}
-                  className={`py-1.5 px-3 rounded-xl text-xs font-bold transition-all border ${
-                    targetTokens === 4
-                      ? 'bg-amber-500/20 border-amber-500 text-amber-300'
-                      : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
-                  }`}
-                >
-                  Standard (4 Tokens)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTargetTokens(2)}
-                  className={`py-1.5 px-3 rounded-xl text-xs font-bold transition-all border ${
-                    targetTokens === 2
-                      ? 'bg-amber-500/20 border-amber-500 text-amber-300'
-                      : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
-                  }`}
-                >
-                  Quick (2 Tokens)
-                </button>
+            {/* If Ludo: Target tokens toggle */}
+            {selectedGame === 'ludo' && (
+              <div className="mb-4">
+                <span className="text-xs font-semibold text-slate-400 block mb-1.5">
+                  Longueur de la partie :
+                </span>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setLudoTokensCount(4)}
+                    className={`py-1.5 px-3 rounded-xl text-xs font-bold transition-all border ${
+                      ludoTokensCount === 4
+                        ? 'bg-amber-500/20 border-amber-500 text-amber-300'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Classique (4 pions)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLudoTokensCount(2)}
+                    className={`py-1.5 px-3 rounded-xl text-xs font-bold transition-all border ${
+                      ludoTokensCount === 2
+                        ? 'bg-amber-500/20 border-amber-500 text-amber-300'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Rapide (2 pions)
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           <button
             onClick={handleCreateOnline}
             disabled={loadingAction !== null}
-            className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-white font-bold text-sm shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+            className={`w-full py-3 px-4 rounded-xl font-bold text-sm shadow-lg transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 ${
+              selectedGame === 'ludo'
+                ? 'bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-white shadow-amber-500/20'
+                : 'bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 shadow-cyan-500/25 font-black'
+            }`}
           >
             {loadingAction === 'create_online' ? (
               <RefreshCw className="w-4 h-4 animate-spin" />
             ) : (
               <>
                 <Plus className="w-4 h-4" />
-                <span>Create Match Room</span>
+                <span>
+                  {selectedGame === 'ludo'
+                    ? 'Créer une Salle Ludo'
+                    : 'Créer une Salle Navale 7×9'}
+                </span>
               </>
             )}
           </button>
         </div>
 
-        {/* Join Room by Code */}
+        {/* Join by Code */}
         <div className="rounded-3xl bg-slate-900/90 border border-slate-800 p-6 flex flex-col justify-between hover:border-indigo-500/40 transition-colors shadow-lg">
           <div>
             <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center mb-4">
               <Share2 className="w-6 h-6" />
             </div>
             <h3 className="text-xl font-bold font-display text-white mb-1">
-              Join with Code
+              Rejoindre avec un Code
             </h3>
             <p className="text-xs sm:text-sm text-slate-400 mb-4">
-              Enter the 6-character room code shared by your friend to jump straight into their board.
+              Entrez le code de salle (ex. LUDO... ou NAV-...) partagé par votre ami pour rejoindre instantanément son terrain.
             </p>
           </div>
 
@@ -258,8 +397,8 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({ onStartGame }) => {
               type="text"
               value={joinCode}
               onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-              placeholder="e.g. LUDO24"
-              maxLength={8}
+              placeholder={selectedGame === 'ludo' ? 'Ex: LUDO24' : 'Ex: NAV-8K29'}
+              maxLength={12}
               className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-4 py-2.5 text-center font-mono font-bold tracking-widest text-white placeholder-slate-600 uppercase focus:outline-none transition-colors"
             />
             <button
@@ -271,7 +410,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({ onStartGame }) => {
                 <RefreshCw className="w-4 h-4 animate-spin" />
               ) : (
                 <>
-                  <span>Join Match</span>
+                  <span>Rejoindre la Partie</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
@@ -279,7 +418,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({ onStartGame }) => {
           </form>
         </div>
 
-        {/* Pass & Play (Local 2-Player) */}
+        {/* Pass & Play (Local 2P) */}
         <div className="rounded-3xl bg-slate-900/90 border border-slate-800 p-6 flex items-center justify-between hover:border-emerald-500/40 transition-colors shadow-lg">
           <div className="max-w-[70%]">
             <div className="flex items-center gap-2.5 mb-1.5">
@@ -287,11 +426,13 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({ onStartGame }) => {
                 <Gamepad2 className="w-4 h-4" />
               </div>
               <h3 className="text-base sm:text-lg font-bold font-display text-white">
-                Pass & Play (Local 2P)
+                Pass & Play (Local 2J)
               </h3>
             </div>
             <p className="text-xs text-slate-400">
-              Share the screen and take turns with a friend next to you on this device.
+              {selectedGame === 'ludo'
+                ? 'Jouez à deux sur le même écran à tour de rôle avec les dés.'
+                : 'Passez le téléphone/ordinateur entre les tours en préservant le secret de vos bateaux !'}
             </p>
           </div>
 
@@ -300,7 +441,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({ onStartGame }) => {
             disabled={loadingAction !== null}
             className="py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm shadow-md transition-all active:scale-95 whitespace-nowrap"
           >
-            Start Local
+            Lancer Local
           </button>
         </div>
 
@@ -312,11 +453,13 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({ onStartGame }) => {
                 <Bot className="w-4 h-4" />
               </div>
               <h3 className="text-base sm:text-lg font-bold font-display text-white">
-                Practice vs Bot
+                Pratique vs Bot IA
               </h3>
             </div>
             <p className="text-xs text-slate-400">
-              Hone your tactics against a smart automated opponent. Zero wait time!
+              {selectedGame === 'ludo'
+                ? "Affrontez notre bot intelligent avec l'exécution auto des coups uniques."
+                : "Combattez l'Amiral Bot et son algorithme de recherche & destruction radar !"}
             </p>
           </div>
 
@@ -325,21 +468,21 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({ onStartGame }) => {
             disabled={loadingAction !== null}
             className="py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs sm:text-sm shadow-md transition-all active:scale-95 whitespace-nowrap"
           >
-            Play Bot
+            Jouer Bot
           </button>
         </div>
       </div>
 
-      {/* Online Players & Direct Invites */}
+      {/* Online Players with Direct Dual-Game Invitations */}
       <div className="rounded-3xl bg-slate-900/90 border border-slate-800 p-6 shadow-xl">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
             <h3 className="text-lg font-bold font-display text-white">
-              Online Players
+              Joueurs en Ligne
             </h3>
             <span className="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-mono">
-              {onlinePlayers.length} online
+              {onlinePlayers.length} en ligne
             </span>
           </div>
 
@@ -347,7 +490,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({ onStartGame }) => {
             onClick={loadPlayers}
             disabled={loadingPlayers}
             className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-            title="Refresh Online Players"
+            title="Rafraîchir les joueurs en ligne"
           >
             <RefreshCw className={`w-4 h-4 ${loadingPlayers ? 'animate-spin' : ''}`} />
           </button>
@@ -355,9 +498,9 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({ onStartGame }) => {
 
         {onlinePlayers.length === 0 ? (
           <div className="py-8 text-center text-slate-500 text-sm">
-            <p>No other players online right now.</p>
+            <p>Aucun autre joueur en ligne actuellement.</p>
             <p className="text-xs mt-1 text-slate-600">
-              Share your room code with a friend or challenge the AI Bot!
+              Partagez votre code de salle ou entraînez-vous contre l'IA Bot !
             </p>
           </div>
         ) : (
@@ -376,47 +519,84 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({ onStartGame }) => {
                       {player.displayName}
                     </span>
                     <span className="text-[10px] text-amber-400 font-medium">
-                      {player.stats?.wins || 0} Wins
+                      {player.stats?.wins || 0} Victoires
                     </span>
                   </div>
                 </div>
 
-                <button
-                  onClick={() => handleInvitePlayer(player)}
-                  disabled={invitedPlayerId === player.id}
-                  className="py-1.5 px-3 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold transition-all active:scale-95 flex items-center gap-1 disabled:opacity-50"
-                >
-                  <Swords className="w-3.5 h-3.5" />
-                  <span>{invitedPlayerId === player.id ? 'Inviting...' : 'Invite'}</span>
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => handleInvitePlayer(player, 'ludo')}
+                    disabled={invitedPlayerId === `${player.id}_ludo`}
+                    className="py-1 px-2.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold transition-all active:scale-95 disabled:opacity-50"
+                    title="Inviter sur Ludo"
+                  >
+                    🎲 Ludo
+                  </button>
+                  <button
+                    onClick={() => handleInvitePlayer(player, 'battleship')}
+                    disabled={invitedPlayerId === `${player.id}_battleship`}
+                    className="py-1 px-2.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-xs font-bold transition-all active:scale-95 disabled:opacity-50"
+                    title="Inviter sur Bataille Navale"
+                  >
+                    ⚓ Navale
+                  </button>
+                </div>
               </div>
             ))}
           </div>
         )}
       </div>
 
-      {/* Rules & Game Guide */}
-      <div className="rounded-3xl bg-slate-900/60 border border-slate-800/60 p-6">
-        <h4 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
-          <ShieldCheck className="w-4 h-4 text-amber-400" />
-          Classic Ludo Rules at a Glance
-        </h4>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-xs text-slate-300">
-          <div className="p-3 rounded-xl bg-slate-950/40 border border-slate-800/60">
-            <span className="font-bold text-amber-400 block mb-1">1. Rolling a 6</span>
-            Roll a 6 to bring a token out of your yard onto the start square, plus receive an extra roll!
+      {/* Rules Guide for both games */}
+      <div className="rounded-3xl bg-slate-900/60 border border-slate-800/60 p-6 space-y-6">
+        <div>
+          <h4 className="text-sm font-bold uppercase tracking-wider text-cyan-400 mb-3 flex items-center gap-1.5">
+            <Anchor className="w-4 h-4" />
+            Règles Bataille Navale (Terrain 7×9 & 5 Navires)
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs text-slate-300">
+            <div className="p-3 rounded-xl bg-slate-950/40 border border-slate-800/60">
+              <span className="font-bold text-cyan-400 block mb-1">1. Terrain 7×9</span>
+              La zone d'engagement comporte 7 colonnes (1-7) et 9 rangées (A-I), soit 63 carreaux de haute tension.
+            </div>
+            <div className="p-3 rounded-xl bg-slate-950/40 border border-slate-800/60">
+              <span className="font-bold text-cyan-400 block mb-1">2. 5 Navires secrets</span>
+              1 de 2 carreaux, 2 de 3 carreaux, 1 de 4 carreaux et 1 de 5 carreaux. Placés secrètement sans se faire repérer !
+            </div>
+            <div className="p-3 rounded-xl bg-slate-950/40 border border-slate-800/60">
+              <span className="font-bold text-cyan-400 block mb-1">3. Tirs Radar & Éclats</span>
+              Chaque tour, tirez une coordonnée : "Touché !", "À l'eau !" ou "Coulé !" quand toutes les sections sombrent.
+            </div>
+            <div className="p-3 rounded-xl bg-slate-950/40 border border-slate-800/60">
+              <span className="font-bold text-cyan-400 block mb-1">4. Victoire Navale</span>
+              Le premier capitaine à couler l'intégralité des 5 navires de sa cible remporte la bataille !
+            </div>
           </div>
-          <div className="p-3 rounded-xl bg-slate-950/40 border border-slate-800/60">
-            <span className="font-bold text-rose-400 block mb-1">2. Captures</span>
-            Landing on an opponent's token sends it back to their yard and earns you an immediate bonus turn.
-          </div>
-          <div className="p-3 rounded-xl bg-slate-950/40 border border-slate-800/60">
-            <span className="font-bold text-emerald-400 block mb-1">3. Safe Star Cells</span>
-            Squares with a star ★ and player starting squares are safe zones where tokens cannot be captured.
-          </div>
-          <div className="p-3 rounded-xl bg-slate-950/40 border border-slate-800/60">
-            <span className="font-bold text-indigo-400 block mb-1">4. Home Goal</span>
-            Navigate around the perimeter and up your home column. First to get all tokens into Home wins!
+        </div>
+
+        <div className="pt-4 border-t border-slate-800/60">
+          <h4 className="text-sm font-bold uppercase tracking-wider text-amber-400 mb-3 flex items-center gap-1.5">
+            <Dices className="w-4 h-4" />
+            Règles Ludo Arena & Nouveautés
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs text-slate-300">
+            <div className="p-3 rounded-xl bg-slate-950/40 border border-slate-800/60">
+              <span className="font-bold text-amber-400 block mb-1">Faire 6</span>
+              Un 6 libère un pion de la base sur le départ et offre immédiatement un lancer supplémentaire.
+            </div>
+            <div className="p-3 rounded-xl bg-slate-950/40 border border-slate-800/60">
+              <span className="font-bold text-rose-400 block mb-1">Captures & Étoiles</span>
+              Atterrir sur un pion adverse le renvoie à sa base. Les cases étoilées ★ sont des zones protégées.
+            </div>
+            <div className="p-3 rounded-xl bg-slate-950/40 border border-slate-800/60">
+              <span className="font-bold text-emerald-400 block mb-1">Animation de Saut</span>
+              Les pions glissent et bondissent dynamiquement lors de chaque déplacement avec effet sonore.
+            </div>
+            <div className="p-3 rounded-xl bg-slate-950/40 border border-slate-800/60">
+              <span className="font-bold text-indigo-400 block mb-1">Coup Unique Auto</span>
+              Si un seul coup légal est possible avec votre dé, il s'exécute automatiquement sans clic forcé !
+            </div>
           </div>
         </div>
       </div>

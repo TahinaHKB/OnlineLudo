@@ -5,10 +5,11 @@ import {
   Clock, 
   History, 
   RefreshCw, 
-  ShieldCheck, 
   Percent,
   Calendar,
-  Award
+  Award,
+  Anchor,
+  Dices
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { gameService } from '../services/gameService';
@@ -18,6 +19,7 @@ export const MatchHistoryScreen: React.FC = () => {
   const { userProfile } = useAuth();
   const [matches, setMatches] = useState<MatchHistoryRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filterType, setFilterType] = useState<'all' | 'ludo' | 'battleship'>('all');
 
   const fetchMatches = async () => {
     if (!userProfile) return;
@@ -35,6 +37,12 @@ export const MatchHistoryScreen: React.FC = () => {
   useEffect(() => {
     fetchMatches();
   }, [userProfile?.id]);
+
+  const filteredMatches = matches.filter((m) => {
+    if (filterType === 'all') return true;
+    const isNaval = m.gameType === 'battleship' || m.gameId.includes('nav');
+    return filterType === 'battleship' ? isNaval : !isNaval;
+  });
 
   const stats = userProfile?.stats || { gamesPlayed: 0, wins: 0, losses: 0, streak: 0 };
   const winRate = stats.gamesPlayed > 0 ? Math.round((stats.wins / stats.gamesPlayed) * 100) : 0;
@@ -58,21 +66,21 @@ export const MatchHistoryScreen: React.FC = () => {
   return (
     <div className="max-w-5xl mx-auto px-4 py-6 space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl sm:text-3xl font-black font-display text-white">
-            Match History & Stats
+            Historique & Statistiques
           </h2>
           <p className="text-xs sm:text-sm text-slate-400">
-            Track your competitive career, win streaks, and past clashes.
+            Suivez vos victoires et affrontements sur Ludo et Bataille Navale.
           </p>
         </div>
 
         <button
           onClick={fetchMatches}
           disabled={loading}
-          className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white transition-colors"
-          title="Refresh History"
+          className="self-start sm:self-center p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white transition-colors"
+          title="Rafraîchir"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
         </button>
@@ -83,7 +91,7 @@ export const MatchHistoryScreen: React.FC = () => {
         {/* Total Matches */}
         <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 shadow">
           <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-2">
-            <span>Matches</span>
+            <span>Parties Jouées</span>
             <History className="w-4 h-4 text-indigo-400" />
           </div>
           <div className="text-2xl sm:text-3xl font-black font-display text-white">
@@ -94,7 +102,7 @@ export const MatchHistoryScreen: React.FC = () => {
         {/* Victories */}
         <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 shadow">
           <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-2">
-            <span>Victories</span>
+            <span>Victoires</span>
             <Trophy className="w-4 h-4 text-emerald-400" />
           </div>
           <div className="text-2xl sm:text-3xl font-black font-display text-emerald-400">
@@ -105,7 +113,7 @@ export const MatchHistoryScreen: React.FC = () => {
         {/* Win Rate */}
         <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 shadow">
           <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-2">
-            <span>Win Rate</span>
+            <span>Taux Victoire</span>
             <Percent className="w-4 h-4 text-amber-400" />
           </div>
           <div className="text-2xl sm:text-3xl font-black font-display text-amber-300">
@@ -116,7 +124,7 @@ export const MatchHistoryScreen: React.FC = () => {
         {/* Win Streak */}
         <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 shadow">
           <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-2">
-            <span>Streak</span>
+            <span>Série en cours</span>
             <Flame className="w-4 h-4 text-rose-500" />
           </div>
           <div className="text-2xl sm:text-3xl font-black font-display text-rose-400">
@@ -125,32 +133,66 @@ export const MatchHistoryScreen: React.FC = () => {
         </div>
       </div>
 
+      {/* Filter Tabs */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setFilterType('all')}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+            filterType === 'all'
+              ? 'bg-slate-800 border-slate-700 text-white'
+              : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+          }`}
+        >
+          Tous ({matches.length})
+        </button>
+        <button
+          onClick={() => setFilterType('ludo')}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5 ${
+            filterType === 'ludo'
+              ? 'bg-amber-500/20 border-amber-500/60 text-amber-300'
+              : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+          }`}
+        >
+          <Dices className="w-3.5 h-3.5" />
+          <span>Ludo</span>
+        </button>
+        <button
+          onClick={() => setFilterType('battleship')}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5 ${
+            filterType === 'battleship'
+              ? 'bg-cyan-500/20 border-cyan-500/60 text-cyan-300'
+              : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+          }`}
+        >
+          <Anchor className="w-3.5 h-3.5" />
+          <span>Bataille Navale</span>
+        </button>
+      </div>
+
       {/* Matches List */}
       <div className="rounded-3xl bg-slate-900/90 border border-slate-800 p-4 sm:p-6 shadow-xl">
         <h3 className="text-lg font-bold font-display text-white mb-4 flex items-center gap-2">
           <Award className="w-5 h-5 text-amber-400" />
-          Recent Matches
+          Matchs Récents
         </h3>
 
         {loading ? (
           <div className="py-12 flex flex-col items-center justify-center gap-2 text-slate-400 text-sm">
             <RefreshCw className="w-6 h-6 animate-spin text-amber-400" />
-            <span>Loading match log...</span>
+            <span>Chargement des combats...</span>
           </div>
-        ) : matches.length === 0 ? (
+        ) : filteredMatches.length === 0 ? (
           <div className="py-12 text-center text-slate-500 text-sm">
-            <p className="font-semibold text-slate-400 mb-1">No recorded matches yet.</p>
-            <p className="text-xs">Complete an online or solo duel to see your battle stats appear here!</p>
+            <p className="font-semibold text-slate-400 mb-1">Aucun match enregistré pour ce filtre.</p>
+            <p className="text-xs">Lancez un duel pour inscrire vos premières victoires !</p>
           </div>
         ) : (
           <div className="space-y-3">
-            {matches.map((m) => {
+            {filteredMatches.map((m) => {
               const isP1 = m.player1Uid === userProfile?.id;
               const isWinner = m.winnerUid === userProfile?.id;
               const opponentName = isP1 ? m.player2Name : m.player1Name;
-              const opponentColor = isP1 ? m.player2Color : m.player1Color;
-              const myTokens = isP1 ? m.player1TokensFinished : m.player2TokensFinished;
-              const oppTokens = isP1 ? m.player2TokensFinished : m.player1TokensFinished;
+              const isNaval = m.gameType === 'battleship' || m.gameId.includes('nav');
 
               return (
                 <div
@@ -161,7 +203,7 @@ export const MatchHistoryScreen: React.FC = () => {
                       : 'bg-rose-950/20 border-rose-800/40 hover:border-rose-700/60'
                   }`}
                 >
-                  {/* Left: Outcome & Opponent */}
+                  {/* Left: Outcome & Game & Opponent */}
                   <div className="flex items-center gap-3">
                     <span
                       className={`px-3 py-1 rounded-xl text-xs font-black uppercase tracking-wider ${
@@ -170,17 +212,20 @@ export const MatchHistoryScreen: React.FC = () => {
                           : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
                       }`}
                     >
-                      {isWinner ? 'VICTORY' : 'DEFEAT'}
+                      {isWinner ? 'VICTOIRE' : 'DÉFAITE'}
                     </span>
 
                     <div>
                       <div className="text-sm font-bold text-white flex items-center gap-2">
-                        <span>vs {opponentName}</span>
-                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 capitalize">
-                          {opponentColor}
+                        <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-slate-800 border border-slate-700">
+                          {isNaval ? <Anchor className="w-3 h-3 text-cyan-400" /> : <Dices className="w-3 h-3 text-amber-400" />}
+                          <span className={isNaval ? 'text-cyan-300' : 'text-amber-300'}>
+                            {isNaval ? 'Bataille Navale' : 'Ludo'}
+                          </span>
                         </span>
+                        <span>vs {opponentName}</span>
                       </div>
-                      <div className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
+                      <div className="text-xs text-slate-400 flex items-center gap-2 mt-1">
                         <span className="flex items-center gap-1">
                           <Calendar className="w-3 h-3" />
                           {formatDate(m.createdAt)}
@@ -194,16 +239,20 @@ export const MatchHistoryScreen: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Right: Score (Tokens in Home) */}
+                  {/* Right: Score */}
                   <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-800">
                     <div className="text-right">
                       <div className="text-[11px] text-slate-400 uppercase tracking-wider font-semibold">
-                        Home Tokens
+                        {isNaval ? 'Flotte Survivante' : 'Pions au But'}
                       </div>
                       <div className="text-sm font-black font-mono text-white">
-                        <span className={isWinner ? 'text-emerald-400' : 'text-slate-300'}>{myTokens}</span>
+                        <span className={isWinner ? 'text-emerald-400' : 'text-slate-300'}>
+                          {isP1 ? m.player1TokensFinished : m.player2TokensFinished}
+                        </span>
                         <span className="text-slate-500 mx-1">-</span>
-                        <span className={!isWinner ? 'text-rose-400' : 'text-slate-300'}>{oppTokens}</span>
+                        <span className={!isWinner ? 'text-rose-400' : 'text-slate-300'}>
+                          {isP1 ? m.player2TokensFinished : m.player1TokensFinished}
+                        </span>
                       </div>
                     </div>
                   </div>

@@ -283,6 +283,11 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
           };
 
           const isP1 = item.slot === 'player1';
+          const wasJustMoved =
+            game.lastMove &&
+            game.lastMove.player === item.slot &&
+            game.lastMove.tokenId === item.index &&
+            Date.now() - game.lastMove.timestamp < 1800;
 
           return (
             <div
@@ -293,13 +298,13 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
                 left: `${item.x}%`,
                 top: `${item.y}%`,
                 transform: 'translate(-50%, -50%)',
-                zIndex: item.isMovable ? 30 : 20,
+                zIndex: wasJustMoved ? 40 : item.isMovable ? 30 : 20,
               }}
-              className={`transition-all duration-300 ${
+              className={`transition-all duration-500 ease-out ${
                 item.isMovable
                   ? 'cursor-pointer hover:scale-125'
                   : 'pointer-events-none'
-              }`}
+              } ${wasJustMoved ? 'animate-token-hop' : ''}`}
             >
               {/* Pulsing ring around active movable tokens */}
               {item.isMovable && (
