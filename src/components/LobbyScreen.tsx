@@ -565,8 +565,8 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
               1 de 2 carreaux, 2 de 3 carreaux, 1 de 4 carreaux et 1 de 5 carreaux. Placés secrètement sans se faire repérer !
             </div>
             <div className="p-3 rounded-xl bg-slate-950/40 border border-slate-800/60">
-              <span className="font-bold text-cyan-400 block mb-1">3. Tirs Radar & Éclats</span>
-              Chaque tour, tirez une coordonnée : "Touché !", "À l'eau !" ou "Coulé !" quand toutes les sections sombrent.
+              <span className="font-bold text-cyan-400 block mb-1">3. Touché = Rejouez !</span>
+              Chaque fois que vous touchez un navire, vous rejouez immédiatement ! C'est uniquement lorsque le tir tombe à l'eau que le tour passe à l'adversaire.
             </div>
             <div className="p-3 rounded-xl bg-slate-950/40 border border-slate-800/60">
               <span className="font-bold text-cyan-400 block mb-1">4. Victoire Navale</span>

@@ -292,7 +292,8 @@ export const battleshipService = {
     opponent.ships = updatedShips;
     opponent.shotsReceived = updatedShots;
 
-    const nextTurn = allSunk ? shooterSlot : (shooterSlot === 'player1' ? 'player2' : 'player1');
+    // Rule: Touching an enemy ship keeps the turn! Missing passes the turn to opponent.
+    const nextTurn = (allSunk || isHit) ? shooterSlot : opponentSlot;
 
     const updatedGame: BattleshipGame = {
       ...game,

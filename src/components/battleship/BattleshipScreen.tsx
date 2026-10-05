@@ -75,13 +75,24 @@ export const BattleshipScreen: React.FC<BattleshipScreenProps> = ({
 
         if (updated.lastShot.sunkShipName) {
           sounds.playShipSunk();
-          setNotification(`☠️ ${updated.lastShot.sunkShipName} adverse COULÉ !`);
+          const isMe = updated.lastShot.shooter === mySlot;
+          setNotification(
+            isMe
+              ? `🎉 ${updated.lastShot.sunkShipName} adverse COULÉ ! Rejouez !`
+              : `🚨 Votre ${updated.lastShot.sunkShipName} a coulé ! L'adversaire rejoue !`
+          );
         } else if (updated.lastShot.isHit) {
           sounds.playExplosion();
-          setNotification('💥 Touché en plein dans le mille !');
+          const isMe = updated.lastShot.shooter === mySlot;
+          setNotification(
+            isMe ? '💥 TOUCHÉ ! Rejouez !' : "💥 Votre flotte a été touchée ! L'adversaire rejoue !"
+          );
         } else {
           sounds.playSplash();
-          setNotification('💧 Plouf ! Tir à l\'eau !');
+          const isMe = updated.lastShot.shooter === mySlot;
+          setNotification(
+            isMe ? "💧 À l'eau ! Au tour de l'adversaire..." : "💧 Tir adverse à l'eau ! À vous de tirer !"
+          );
         }
 
         setTimeout(() => setNotification(null), 3000);
@@ -116,13 +127,13 @@ export const BattleshipScreen: React.FC<BattleshipScreenProps> = ({
 
       if (result.sunkShipName) {
         sounds.playShipSunk();
-        setNotification(`🚨 Aïe ! Votre ${result.sunkShipName} a coulé !`);
+        setNotification(`🚨 Aïe ! Votre ${result.sunkShipName} a coulé ! L'Amiral Bot rejoue...`);
       } else if (result.isHit) {
         sounds.playExplosion();
-        setNotification('💥 Votre bateau a été touché !');
+        setNotification("💥 Votre bateau a été touché ! L'Amiral Bot rejoue...");
       } else {
         sounds.playSplash();
-        setNotification("💧 Ouf ! Le tir de l'Amiral Bot est tombé à l'eau !");
+        setNotification("💧 Ouf ! Le tir de l'Amiral Bot est tombé à l'eau ! À vous !");
       }
 
       setGame(result.updatedGame);
@@ -185,13 +196,13 @@ export const BattleshipScreen: React.FC<BattleshipScreenProps> = ({
 
     if (result.sunkShipName) {
       sounds.playShipSunk();
-      setNotification(`🎉 YOUPI ! ${result.sunkShipName} adverse coulé !`);
+      setNotification(`🎉 YOUPI ! ${result.sunkShipName} adverse coulé ! Vous rejouez !`);
     } else if (result.isHit) {
       sounds.playExplosion();
-      setNotification('💥 BOUM ! Navire touché !');
+      setNotification('💥 BOUM ! Navire touché ! Vous rejouez !');
     } else {
       sounds.playSplash();
-      setNotification('💧 Plouf ! Dans l\'eau !');
+      setNotification("💧 Plouf ! Dans l'eau... Au tour de l'adversaire !");
     }
 
     setGame(result.updatedGame);
