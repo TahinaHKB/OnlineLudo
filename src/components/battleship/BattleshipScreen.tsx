@@ -192,25 +192,31 @@ export const BattleshipScreen: React.FC<BattleshipScreenProps> = ({
   const handleFire = async (r: number, c: number) => {
     if (!isMyTurn || isBotThinking) return;
 
-    const result = await battleshipService.fireShot(game, mySlot, r, c);
+    try {
+      const result = await battleshipService.fireShot(game, mySlot, r, c);
 
-    if (result.sunkShipName) {
-      sounds.playShipSunk();
-      setNotification(`🎉 YOUPI ! ${result.sunkShipName} adverse coulé ! Vous rejouez !`);
-    } else if (result.isHit) {
-      sounds.playExplosion();
-      setNotification('💥 BOUM ! Navire touché ! Vous rejouez !');
-    } else {
-      sounds.playSplash();
-      setNotification("💧 Plouf ! Dans l'eau... Au tour de l'adversaire !");
-    }
+      if (result.sunkShipName) {
+        sounds.playShipSunk();
+        setNotification(`🎉 YOUPI ! ${result.sunkShipName} adverse coulé ! Vous rejouez !`);
+      } else if (result.isHit) {
+        sounds.playExplosion();
+        setNotification('💥 BOUM ! Navire touché ! Vous rejouez !');
+      } else {
+        sounds.playSplash();
+        setNotification("💧 Plouf ! Dans l'eau... Au tour de l'adversaire !");
+      }
 
-    setGame(result.updatedGame);
-    setTimeout(() => setNotification(null), 2500);
+      setGame(result.updatedGame);
+      setTimeout(() => setNotification(null), 2500);
 
-    if (result.isVictory) {
-      const won = result.updatedGame.winner === mySlot;
-      recordMatchResult(won);
+      if (result.isVictory) {
+        const won = result.updatedGame.winner === mySlot;
+        recordMatchResult(won);
+      }
+    } catch (err) {
+      console.error('Erreur lors du tir en ligne:', err);
+      setNotification('⚠️ Erreur réseau lors du tir. Réessayez !');
+      setTimeout(() => setNotification(null), 3000);
     }
   };
 

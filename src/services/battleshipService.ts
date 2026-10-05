@@ -20,6 +20,9 @@ import {
 import { UserProfile, MatchHistoryRecord } from '../types/ludo';
 import { generateRandomFleet, processShot } from '../utils/battleshipRules';
 
+// Use 'games' collection to ensure 100% compatibility with existing Firestore security rules
+const GAMES_COLLECTION = 'games';
+
 const generateBattleshipRoomCode = (): string => {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let result = 'NAV-';
@@ -31,10 +34,10 @@ const generateBattleshipRoomCode = (): string => {
 
 export const battleshipService = {
   /**
-   * Create an online Battleship game room
+   * Create an online Battleship game room in Firestore
    */
   async createOnlineGame(creator: UserProfile): Promise<BattleshipGame> {
-    const gameId = doc(collection(db, 'battleship_games')).id;
+    const gameId = doc(collection(db, GAMES_COLLECTION)).id;
     const roomCode = generateBattleshipRoomCode();
 
     const player1: BattleshipPlayerState = {
@@ -61,7 +64,10 @@ export const battleshipService = {
       updatedAt: Date.now(),
     };
 
-    await setDoc(doc(db, 'battleship_games', gameId), newGame);
+    await setDoc(doc(db, GAMES_COLLECTION, gameId), {
+      ...newGame,
+      gameType: 'battleship',
+    });
     return newGame;
   },
 
@@ -159,7 +165,7 @@ export const battleshipService = {
   async joinGameByCode(user: UserProfile, roomCode: string): Promise<BattleshipGame> {
     const cleanCode = roomCode.trim().toUpperCase();
     const q = query(
-      collection(db, 'battleship_games'),
+      collection(db, GAMES_COLLECTION),
       where('roomCode', '==', cleanCode),
       limit(1)
     );
@@ -203,7 +209,7 @@ export const battleshipService = {
       updatedAt: Date.now(),
     };
 
-    await updateDoc(doc(db, 'battleship_games', game.id), updatedData);
+    await updateDoc(doc(db, GAMES_COLLECTION, game.id), updatedData);
     return { ...game, ...updatedData, player2 };
   },
 
@@ -211,7 +217,7 @@ export const battleshipService = {
    * Subscribe to real-time Battleship updates
    */
   subscribeToGame(gameId: string, onUpdate: (game: BattleshipGame) => void): Unsubscribe {
-    const unsub = onSnapshot(doc(db, 'battleship_games', gameId), (snap) => {
+    const unsub = onSnapshot(doc(db, GAMES_COLLECTION, gameId), (snap) => {
       if (snap.exists()) {
         onUpdate(snap.data() as BattleshipGame);
       }
@@ -227,26 +233,39 @@ export const battleshipService = {
     playerSlot: 'player1' | 'player2',
     ships: PlacedShip[]
   ): Promise<BattleshipGame> {
+    let currentGame = game;
+
+    if (game.mode === 'online') {
+      try {
+        const snap = await getDoc(doc(db, GAMES_COLLECTION, game.id));
+        if (snap.exists()) {
+          currentGame = snap.data() as BattleshipGame;
+        }
+      } catch (err) {
+        console.warn('Could not read latest doc in confirmFleet:', err);
+      }
+    }
+
     const isP1 = playerSlot === 'player1';
-    const targetPlayer = isP1 ? { ...game.player1 } : { ...game.player2! };
+    const targetPlayer = isP1 ? { ...currentGame.player1 } : { ...currentGame.player2! };
     targetPlayer.ships = ships;
     targetPlayer.ready = true;
 
     // Check if both players are now ready
-    const otherPlayer = isP1 ? game.player2 : game.player1;
-    const bothReady = otherPlayer && otherPlayer.ready;
+    const otherPlayer = isP1 ? currentGame.player2 : currentGame.player1;
+    const bothReady = Boolean(otherPlayer && otherPlayer.ready);
 
     const updatedState: BattleshipGame = {
-      ...game,
-      player1: isP1 ? targetPlayer : game.player1,
-      player2: !isP1 ? targetPlayer : game.player2,
+      ...currentGame,
+      player1: isP1 ? targetPlayer : currentGame.player1,
+      player2: !isP1 ? targetPlayer : currentGame.player2,
       status: bothReady ? 'playing' : 'placement',
       turnDeadline: Date.now() + 45000,
       updatedAt: Date.now(),
     };
 
-    if (game.mode === 'online') {
-      await updateDoc(doc(db, 'battleship_games', game.id), {
+    if (currentGame.mode === 'online') {
+      await updateDoc(doc(db, GAMES_COLLECTION, currentGame.id), {
         player1: updatedState.player1,
         player2: updatedState.player2,
         status: updatedState.status,
@@ -279,8 +298,21 @@ export const battleshipService = {
       return { updatedGame: game, isHit: false, isVictory: false };
     }
 
+    let currentGame = game;
+    if (game.mode === 'online') {
+      try {
+        const gameRef = doc(db, GAMES_COLLECTION, game.id);
+        const snap = await getDoc(gameRef);
+        if (snap.exists()) {
+          currentGame = snap.data() as BattleshipGame;
+        }
+      } catch (err) {
+        console.warn('Could not fetch latest doc before shot:', err);
+      }
+    }
+
     const opponentSlot = shooterSlot === 'player1' ? 'player2' : 'player1';
-    const opponent = opponentSlot === 'player1' ? { ...game.player1 } : { ...game.player2! };
+    const opponent = opponentSlot === 'player1' ? { ...currentGame.player1 } : { ...currentGame.player2! };
 
     const { updatedShips, updatedShots, isHit, sunkShipName, allSunk } = processShot(
       opponent.ships,
@@ -295,27 +327,31 @@ export const battleshipService = {
     // Rule: Touching an enemy ship keeps the turn! Missing passes the turn to opponent.
     const nextTurn = (allSunk || isHit) ? shooterSlot : opponentSlot;
 
+    // Guaranteed zero undefined fields so Firestore updateDoc never fails
+    const lastShotData = {
+      shooter: shooterSlot,
+      r,
+      c,
+      isHit,
+      sunkShipName: sunkShipName || '',
+      timestamp: Date.now(),
+    };
+
     const updatedGame: BattleshipGame = {
-      ...game,
+      ...currentGame,
       status: allSunk ? 'completed' : 'playing',
       winner: allSunk ? shooterSlot : null,
       currentTurn: nextTurn,
-      player1: opponentSlot === 'player1' ? opponent : game.player1,
-      player2: opponentSlot === 'player2' ? opponent : game.player2,
-      lastShot: {
-        shooter: shooterSlot,
-        r,
-        c,
-        isHit,
-        sunkShipName,
-        timestamp: Date.now(),
-      },
+      player1: opponentSlot === 'player1' ? opponent : currentGame.player1,
+      player2: opponentSlot === 'player2' ? opponent : currentGame.player2,
+      lastShot: lastShotData,
       turnDeadline: Date.now() + 45000,
       updatedAt: Date.now(),
     };
 
-    if (game.mode === 'online') {
-      await updateDoc(doc(db, 'battleship_games', game.id), {
+    if (currentGame.mode === 'online') {
+      const gameRef = doc(db, GAMES_COLLECTION, currentGame.id);
+      await updateDoc(gameRef, {
         status: updatedGame.status,
         winner: updatedGame.winner,
         currentTurn: updatedGame.currentTurn,

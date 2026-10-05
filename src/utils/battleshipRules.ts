@@ -159,8 +159,8 @@ export function processShot(
     r,
     c,
     isHit,
-    shipId: isHit ? updatedShips[hitShipIndex].id : undefined,
-    sunkShipName,
+    shipId: isHit ? updatedShips[hitShipIndex].id : '',
+    sunkShipName: sunkShipName || '',
     timestamp: Date.now(),
   };
 
